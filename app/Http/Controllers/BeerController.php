@@ -4,8 +4,15 @@ namespace App\Http\Controllers;
 
 use App\Exports\BeerExport;
 use App\Http\Requests\BeerRequest;
+use App\Jobs\ExportJob;
+use App\Jobs\SendExportEmailJob;
+use App\Jobs\StoreExportDataJob;
+use App\Mail\ExportEmail;
 use App\Services\PunkapiService;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Mail;
 use Maatwebsite\Excel\Facades\Excel;
+use App\Models\Export;
 
 class BeerController extends Controller
 {
@@ -21,20 +28,40 @@ class BeerController extends Controller
 
     public function export(BeerRequest $request,PunkapiService $service)
     {
-        $beers =  $service->getBeers(...$request->validated());
+        $filename = "cervejas-encontradas-".now()->format("Y-m-d H_i").".xlsx";
 
-        $filteredBeers = collect($beers)->map(function($value,$key) {
-            return collect($value)
-                ->only(['name','tagline','first_brewed','description']);
-        })->toArray();
+        // FORMA ASSINCRONA
+        ExportJob::withChain([
+            (new SendExportEmailJob($filename))->delay(5),
+            (new StoreExportDataJob(Auth::user(), $filename))->delay(10)
+        ])->dispatch($request->validated(),$filename);
 
-        // dd($filteredBeers);
+        // FORMA SINCROANA
+        // ExportJob::dispatchSync($request->validated(), $filename);
 
-        Excel::store(
-            new BeerExport($filteredBeers),
-            'olw-report.xlsx',
-            's3'
-        );
+
+        // ANTIGO CONTROLLER TRANSFORMADO EM JOBS ( EXPORTJOB, SENDEXPORTEMAILJOB, STOREEXPORTDATAJOB)
+        // $beers =  $service->getBeers(...$request->validated());
+
+        // $filteredBeers = collect($beers)->map(function($value,$key) {
+        //     return collect($value)
+        //         ->only(['name','tagline','first_brewed','description']);
+        // })->toArray();
+
+
+        // Excel::store(
+        //     new BeerExport($filteredBeers),
+        //     $filename,
+        //     's3'
+        // );
+
+        // Mail::to("duh19rc@gmail.com")
+        //     ->send(new ExportEmail($filename));
+
+        // Export::create([
+        //     'file_name' => $filename,
+        //     'user_id' => Auth::user()->id
+        // ]);
 
         return 'Relatorio Criado';
     }
