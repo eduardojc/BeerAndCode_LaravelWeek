@@ -13,6 +13,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Models\Export;
+use App\Models\Meal;
+use Inertia\Inertia;
 
 class BeerController extends Controller
 {
@@ -23,7 +25,15 @@ class BeerController extends Controller
             atribui o array associativo conforme a sequencia enviada pelo request,
             sem sem importar com a sequencia requisitada pela classe;
         */
-        return $service->getBeers(...$request->validated());
+        $filters = $request->validated();
+        $beers = $service->getBeers(...$filters);
+        $meals = Meal::all();
+
+        return Inertia::render('Beers',[
+                'beers' => $beers,
+                'meals' => $meals,
+                'filters' => $filters
+            ]);
     }
 
     public function export(BeerRequest $request,PunkapiService $service)
@@ -32,8 +42,8 @@ class BeerController extends Controller
 
         // FORMA ASSINCRONA
         ExportJob::withChain([
-            (new SendExportEmailJob($filename))->delay(5),
-            (new StoreExportDataJob(Auth::user(), $filename))->delay(10)
+            new SendExportEmailJob($filename),
+            new StoreExportDataJob(Auth::user(), $filename)
         ])->dispatch($request->validated(),$filename);
 
         // FORMA SINCROANA
@@ -63,6 +73,7 @@ class BeerController extends Controller
         //     'user_id' => Auth::user()->id
         // ]);
 
-        return 'Relatorio Criado';
+        return redirect()->back()
+            ->with('success', 'Seu Arquivo foi enviado para processamento e em breve estará em seu email');
     }
 }
