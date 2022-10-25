@@ -16,6 +16,8 @@ use App\Models\Export;
 use App\Models\Meal;
 use Inertia\Inertia;
 
+
+
 class BeerController extends Controller
 {
     // PunkapiSerice a classe é injetada (injeção de dependencia);
@@ -39,40 +41,13 @@ class BeerController extends Controller
     public function export(BeerRequest $request,PunkapiService $service)
     {
         $filename = "cervejas-encontradas-".now()->format("Y-m-d H_i").".xlsx";
-
+      
         // FORMA ASSINCRONA
         ExportJob::withChain([
             new SendExportEmailJob($filename),
             new StoreExportDataJob(Auth::user(), $filename)
         ])->dispatch($request->validated(),$filename);
-
-        // FORMA SINCROANA
-        // ExportJob::dispatchSync($request->validated(), $filename);
-
-
-        // ANTIGO CONTROLLER TRANSFORMADO EM JOBS ( EXPORTJOB, SENDEXPORTEMAILJOB, STOREEXPORTDATAJOB)
-        // $beers =  $service->getBeers(...$request->validated());
-
-        // $filteredBeers = collect($beers)->map(function($value,$key) {
-        //     return collect($value)
-        //         ->only(['name','tagline','first_brewed','description']);
-        // })->toArray();
-
-
-        // Excel::store(
-        //     new BeerExport($filteredBeers),
-        //     $filename,
-        //     's3'
-        // );
-
-        // Mail::to("duh19rc@gmail.com")
-        //     ->send(new ExportEmail($filename));
-
-        // Export::create([
-        //     'file_name' => $filename,
-        //     'user_id' => Auth::user()->id
-        // ]);
-
+      
         return redirect()->back()
             ->with('success', 'Seu Arquivo foi enviado para processamento e em breve estará em seu email');
     }
